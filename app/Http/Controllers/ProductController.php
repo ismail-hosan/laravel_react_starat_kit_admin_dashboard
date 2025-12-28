@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Helper;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ProductController extends Controller
@@ -19,7 +21,7 @@ class ProductController extends Controller
                     ->orWhere('description', 'like', "%{$search}%");
             })
             ->latest()
-            ->paginate(10)
+            ->paginate(8)
             ->withQueryString(); // keeps search when paginating
 
         return Inertia::render('products/index', [
@@ -52,6 +54,10 @@ class ProductController extends Controller
             'price' => 'required',
         ]);
 
+        if ($request->hasFile('picture')) {
+            $validated['image'] = Helper::uploadFileToPublic('products', $request->file('picture'));
+        }
+
         $product = Product::create($validated);
 
         return redirect()->route('products.index')->with('message', 'Product created successfully.');
@@ -62,7 +68,11 @@ class ProductController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $product = Product::find($id);
+
+        return Inertia::render('products/view', [
+            'product' => $product,
+        ]);
     }
 
     /**
@@ -70,7 +80,11 @@ class ProductController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        $product = Product::find($id);
+
+        return Inertia::render('products/edit', [
+            'product' => $product,
+        ]);
     }
 
     /**
@@ -78,7 +92,37 @@ class ProductController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'name' => 'required',
+            'description' => 'required',
+            'price' => 'required',
+        ]);
+
+        $product = Product::find($id);
+
+        if ($request->hasFile('picture')) {
+            if ($product->image) {
+                $oldImage = str_replace('storage/', '', $product->image);
+
+                if (Storage::disk('public')->exists($oldImage)) {
+                    Storage::disk('public')->delete($oldImage);
+                }
+            }
+            $validated['image'] = Helper::uploadFileToPublic('products', $request->file('picture'));
+        }
+
+        $product->update($validated);
+
+        return redirect()->route('products.index')->with('message', 'Product updated successfully.');
+    }
+
+    public function statusUpdate(Request $request, $id)
+    {
+        Product::where('id', $id)->update([
+            'status' => $request->status,
+        ]);
+
+        return back();
     }
 
     /**
@@ -86,6 +130,20 @@ class ProductController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $product = Product::findOrFail($id);
+
+        if ($product->image) {
+            $oldImage = str_replace('storage/', '', $product->image);
+
+            if (Storage::disk('public')->exists($oldImage)) {
+                Storage::disk('public')->delete($oldImage);
+            }
+        }
+
+        $product->delete();
+
+        return redirect()
+            ->route('products.index')
+            ->with('message', 'Product deleted successfully.');
     }
 }

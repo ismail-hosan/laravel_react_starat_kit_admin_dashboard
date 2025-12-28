@@ -12,5 +12,17 @@ class Product extends Model
         'name',
         'price',
         'description',
+        'category',
+        'status',
+        'image',
     ];
+
+    protected $appends = [
+        'image_url',
+    ];
+
+    public function getImageUrlAttribute()
+    {
+        return asset($this->image);
+    }
 }
